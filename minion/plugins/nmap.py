@@ -80,6 +80,25 @@ def _create_wordy_version_issue(ip, service, hostname):
     return issue
 
 
+def _create_wordy_header_issue(ip, service, hostname):
+    issue = {
+        'Severity': 'Low',
+        'Summary': ip + ': ' + str(service['port']) + '/' + str(service['protocol']) + ' open: "' + service['header'] + '" (information disclosure)',
+        'Description': 'Information disclosure because of sent header "x-powered-by" for this host',
+        'URLs': [{'URL': ip}],
+        'Ports': [service['port']],
+        'Classification': {
+            'cwe_id': '200',
+            'cwe_url': 'http://cwe.mitre.org/data/definitions/200.html'
+        }
+    }
+
+    # Add hostname to description if available
+    if hostname:
+        issue['Description'] += ' ' + hostname
+
+    return issue
+
 def _create_bad_filtration_firewall_issue(ip, closed_ports, filtered_ports, hostname):
     issue = {
         "Severity": "Medium",
@@ -190,9 +209,30 @@ def parse_nmap_xml(output):
             service_name = service.get('name')
             service_product = service.get('product')
 
+            # Add version if present
+            if 'version' in service:
+                service_product += ' ' + service.get('version')
+
+            # Add extra info if present
+            if 'extrainfo' in service:
+                service_product += ' ' + service.get('extrainfo')
+
+            res = {'port': int(port), 'protocol': protocol, 'state': state,
+                   'service': service_name, 'version': service_product}
+
+            # Get Script result
+            script = opened.find('script')
+            if script is not None:
+                output = script.get('output')
+
+                # Check if powered-by header exists
+                if "x-powered-by" in output:
+                    version = output.split("x-powered-by:", 1)[1]
+
+                    res["header"] = version
+
             # Add port info to finding list
-            ips[current_ip].append({'port': int(port), 'protocol': protocol, 'state': state,
-                                    'service': service_name, 'version': service_product})
+            ips[current_ip].append(res)
 
         # Check if there are extra ports closed
         for extra in ports.findall('extraports'):
@@ -263,7 +303,7 @@ def _validate_open_ports(open_ports):
 
 class NMAPPlugin(ExternalProcessPlugin):
     PLUGIN_NAME = "NMAP"
-    PLUGIN_VERSION = "0.2"
+    PLUGIN_VERSION = "0.2.1"
     PLUGIN_WEIGHT = "light"
 
     NMAP_NAME = "nmap"
@@ -345,6 +385,8 @@ class NMAPPlugin(ExternalProcessPlugin):
                     if service['version'] and service['version'] != 'None' \
                             and service['version'].lower() not in self.version_whitelist:
                         issues.append(_create_wordy_version_issue(ip, service, hostname))
+                    elif service.get('header') and service['header'].lower() not in self.version_whitelist:
+                        issues.append(_create_wordy_header_issue(ip, service, hostname))
 
             # Check broken firewall rules
             if closed_ports and filtered_ports:
@@ -444,6 +486,10 @@ class NMAPPlugin(ExternalProcessPlugin):
         args += ["-oX", self.xml_output, "--no-stylesheet"]
 
         args += [str(target)]
+
+        # Add script to check html-php version
+        if self.configuration.get('html-php-version'):
+            args += ["--script=http-php-version"]
 
         self.spawn('/usr/bin/sudo', args)
 
