@@ -63,7 +63,8 @@ def _create_authorized_open_port_issue(ip, port, protocol, hostname):
 def _create_wordy_version_issue(ip, service, hostname):
     issue = {
         'Severity': 'Low',
-        'Summary': ip + ': ' + str(service['port']) + '/' + str(service['protocol']) + ' open: "' + service['version'] + '" (information disclosure)',
+        'Summary': ip + ': ' + str(service['port']) + '/' + str(service['protocol']) + ' open: "' + str(service['version'])
+                   + '" (information disclosure)',
         'Description': 'Information disclosure for this host',
         'URLs': [{'URL': ip}],
         'Ports': [service['port']],
@@ -210,11 +211,11 @@ def parse_nmap_xml(output):
             service_product = service.get('product')
 
             # Add version if present
-            if 'version' in service:
+            if 'version' in service.attrib:
                 service_product += ' ' + service.get('version')
 
             # Add extra info if present
-            if 'extrainfo' in service:
+            if 'extrainfo' in service.attrib:
                 service_product += ' ' + service.get('extrainfo')
 
             res = {'port': int(port), 'protocol': protocol, 'state': state,
