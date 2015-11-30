@@ -62,7 +62,7 @@ def _create_authorized_open_port_issue(ip, port, protocol, hostname):
 
 def _create_wordy_version_issue(ip, service, hostname):
     issue = {
-        'Severity': 'Low',
+        'Severity': 'Medium',
         'Summary': ip + ': ' + str(service['port']) + '/' + str(service['protocol']) + ' open: "' + str(service['version'])
                    + '" (information disclosure)',
         'Description': 'Information disclosure for this host',
@@ -83,7 +83,7 @@ def _create_wordy_version_issue(ip, service, hostname):
 
 def _create_wordy_header_issue(ip, service, hostname):
     issue = {
-        'Severity': 'Low',
+        'Severity': 'Medium',
         'Summary': ip + ': ' + str(service['port']) + '/' + str(service['protocol']) + ' open: "' + service['header'] + '" (information disclosure)',
         'Description': 'Information disclosure because of sent header "x-powered-by" for this host',
         'URLs': [{'URL': ip}],
@@ -102,7 +102,7 @@ def _create_wordy_header_issue(ip, service, hostname):
 
 def _create_bad_filtration_firewall_issue(ip, closed_ports, filtered_ports, hostname):
     issue = {
-        "Severity": "Medium",
+        "Severity": "Low",
         "Summary": ip + " - Probably misconfigured firewall",
         "Description": "The scan showed that both closed and filtered ports are present whereas they should be filtered"
                        "\n\n"
@@ -125,7 +125,7 @@ def _create_bad_filtration_firewall_issue(ip, closed_ports, filtered_ports, host
 
 def _create_missing_filtration_firewall_issue(ip, closed_ports, hostname):
     issue = {
-        "Severity": "Medium",
+        "Severity": "Low",
         "Summary": ip + " - Probably missing rules in firewall or no firewall at all",
         "Description": "The scan showed that only closed ports are present whereas they should be filtered"
                        "\n\n"
