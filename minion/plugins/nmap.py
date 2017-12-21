@@ -16,7 +16,6 @@ from netaddr import IPNetwork, IPAddress
 
 from minion.plugins.base import ExternalProcessPlugin
 
-
 def _create_unauthorized_open_port_issue(ip, port, protocol, port_severity, hostname):
     # Get the severity of the port
     sev = find_open_port_severity(str(port) + '/' + str(protocol), port_severity)
@@ -87,6 +86,25 @@ def _create_wordy_header_issue(ip, service, hostname):
         'Summary': ip + ': ' + str(service['port']) + '/' + str(service['protocol']) + ' open: "' + service['header'] + '" (information disclosure)',
         'Description': 'Information disclosure because of sent header "x-powered-by" for this host',
         'URLs': [{'URL': ip}],
+        'Ports': [service['port']],
+        'Classification': {
+            'cwe_id': '200',
+            'cwe_url': 'http://cwe.mitre.org/data/definitions/200.html'
+        }
+    }
+
+    # Add hostname to description if available
+    if hostname:
+        issue['Description'] += ' ' + hostname
+
+    return issue
+
+def _create_wordy_script_issue(ip, service, hostname):
+    detailed_output = "".join(service['script'])
+    issue = {
+        'Severity': 'Medium',
+        'Summary': ip + ': ' + str(service['port']) + '/' + str(service['protocol']) + '" (information disclosure)',
+        'Description': "Result : \n" + detailed_output,
         'Ports': [service['port']],
         'Classification': {
             'cwe_id': '200',
@@ -231,6 +249,8 @@ def parse_nmap_xml(output):
                     version = output.split("x-powered-by:", 1)[1]
 
                     res["header"] = version
+                else :
+                    res['script'] = output
 
             # Add port info to finding list
             ips[current_ip].append(res)
@@ -304,7 +324,7 @@ def _validate_open_ports(open_ports):
 
 class NMAPPlugin(ExternalProcessPlugin):
     PLUGIN_NAME = "NMAP"
-    PLUGIN_VERSION = "0.2.1"
+    PLUGIN_VERSION = "0.2.1.01"
     PLUGIN_WEIGHT = "light"
 
     NMAP_NAME = "nmap"
@@ -322,6 +342,7 @@ class NMAPPlugin(ExternalProcessPlugin):
             return whitelist
         except Exception as e:
             raise Exception("Can't open the file for the given path")
+
 
     # Function used to generate issues from parsed data of nmap output
     def ips_to_issues(self, ips):
@@ -388,13 +409,14 @@ class NMAPPlugin(ExternalProcessPlugin):
                         issues.append(_create_wordy_version_issue(ip, service, hostname))
                     elif service.get('header') and service['header'].lower() not in self.version_whitelist:
                         issues.append(_create_wordy_header_issue(ip, service, hostname))
+                    elif 'script' in service  and service['script'] != 'None':
+                        issues.append(_create_wordy_script_issue(ip, service, hostname))
 
             # Check broken firewall rules
             if closed_ports and filtered_ports:
                 issues.append(_create_bad_filtration_firewall_issue(ip, closed_ports, filtered_ports, hostname))
             elif closed_ports:
                 issues.append(_create_missing_filtration_firewall_issue(ip, closed_ports, hostname))
-
         return issues
 
     def do_start(self):
